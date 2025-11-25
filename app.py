@@ -151,7 +151,7 @@ st.download_button(
 
 st.markdown("---")
 
-STEP 8 — EXPIRING SOON LIST DOWNLOAD (item + cat_no + quantity)
+#STEP 8 — EXPIRING SOON LIST DOWNLOAD (item + cat_no + quantity)
 # ============================================================
 # Filter and select item, cat_no, and quantity
 exp_soon_df = df[df["status"] == "expiring_soon"][["item", "cat_no", "quantity"]]
