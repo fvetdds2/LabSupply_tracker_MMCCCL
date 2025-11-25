@@ -247,6 +247,7 @@ CAL_MAP = {
     "glucose": "Universal Calibrator 3",
     "triglycerides": "Universal Calibrator 3",
     "urea": "Universal Calibrator 3",
+    "Albumin BCP": "Universal Calibrator 3",
     "total protein 2": "Universal Calibrator 3",
 }
 
@@ -261,7 +262,7 @@ QC_MAP = {
     "Total T3": "QC1",
     "Vitamin D": "QC1",
     # QC2
-    "alblumin BCP": "QC2",
+    "Alblumin BCP": "QC2",
     "ALKP": "QC2",
     "ALT2": "QC2",
     "AST2": "QC2",
