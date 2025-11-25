@@ -3,6 +3,8 @@ import pandas as pd
 from datetime import datetime, timedelta
 import streamlit as st
 import plotly.express as px
+import os
+from io import BytesIO
 
 st.set_page_config(page_title="Lab Supply Inventory", layout="wide")
 st.title("Lab Supply Inventory — Interactive Dashboard")
