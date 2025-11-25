@@ -1,7 +1,7 @@
 import pandas as pd
 from datetime import datetime, timedelta
 import streamlit as st
-import plotly.express as px
+import plotly.express as px   # currently unused, but ok to leave
 import os
 from io import BytesIO
 
@@ -226,87 +226,23 @@ st.download_button(
 st.markdown("---")
 
 # ============================================================
-# STEP 9 — STATUS MATRIX (Reagent / Calibrator / QC)
+# STEP 9 — STATUS MATRIX (Reagent / Calibrator / QC + quantities)
 # ============================================================
 
 st.header("Status Matrix — Reagent / Calibrator / QC by Test Type")
 
-# --- classify component from item name ---
-def classify_component(item_name: str) -> str:
-    name = str(item_name).lower()
-    if "reagent" in name:
-        return "Reagent"
-    if "calibrator" in name or "calib" in name:
-        return "Calibrator"
-    if "qc" in name or "control" in name:
-        return "QC"
-    return "Other"
+# --- Mappings for shared Universal Calibrators and QC types ---
 
-matrix_df_src = df.copy()
-matrix_df_src["component"] = matrix_df_src["item"].apply(classify_component)
-
-# only keep the 3 essential components
-matrix_df_src = matrix_df_src[matrix_df_src["component"].isin(["Reagent", "Calibrator", "QC"])]
-
-test_types = sorted(matrix_df_src["type"].dropna().astype(str).unique())
-components = ["Reagent", "Calibrator", "QC"]
-
-rows = []
-for t in test_types:
-    row = {"Type": t}
-    for comp in components:
-        sub = matrix_df_src[
-            (matrix_df_src["type"].astype(str) == t) &
-            (matrix_df_src["component"] == comp)
-        ]
-        if sub.empty:
-            status = "missing"
-        else:
-            if (sub["status"] == "expired").any():
-                status = "expired"
-            elif (sub["status"] == "expiring_soon").any():
-                status = "expiring_soon"
-            else:
-                status = "ok"
-        row[comp] = status
-    rows.append(row)
-
-status_matrix = pd.DataFrame(rows).set_index("Type")
-
-# readable icons
-status_display = status_matrix.replace({
-    "ok": "🟢 OK",
-    "expiring_soon": "🟡 Soon",
-    "expired": "🔴 Expired",
-    "missing": "⚪ Missing"
-})
-
-st.dataframe(status_display, use_container_width=True)
-
-st.markdown("""
-**Legend:**  
-🟢 OK – available • 🟡 Soon – expiring in 30 days  
-🔴 Expired – expired • ⚪ Missing – no item in inventory  
-""")
-
-st.markdown("---")
-
-# ============================================================
-# STEP 10 — PIE CHARTS WITH CORRECT GROUPING & HORIZONTAL LABELS
-# ============================================================
-
-st.header("Inventory Status Breakdown by Type (Pie Charts)")
-
-# ---- Calibrator mapping ----
 CAL_MAP = {
+    # Universal Calibrator 1
     "AST 2": "Universal Calibrator 1",
     "uric 2": "Universal Calibrator 1",
     "TPRO2": "Universal Calibrator 1",
     "ALT2": "Universal Calibrator 1",
-
+    # Universal Calibrator 2
     "HDL": "Universal Calibrator 2",
-
-    "Chole": "Universal Calibrator 3",
+    # Universal Calibrator 3
+    "Chol": "Universal Calibrator 3",
     "Creatinine": "Universal Calibrator 3",
     "glucose": "Universal Calibrator 3",
     "triglycerides": "Universal Calibrator 3",
@@ -314,7 +250,6 @@ CAL_MAP = {
     "total protein 2": "Universal Calibrator 3",
 }
 
-# ---- QC mapping ----
 QC_MAP = {
     # QC1
     "FSH": "QC1",
@@ -324,8 +259,7 @@ QC_MAP = {
     "TSH": "QC1",
     "Total T4": "QC1",
     "Total T3": "QC1",
-    "Vitamiin D": "QC1",
-
+    "Vitamin D": "QC1",
     # QC2
     "alblumin BCP": "QC2",
     "ALKP": "QC2",
@@ -343,68 +277,120 @@ QC_MAP = {
     "Trigly": "QC2",
     "urea nitrogen": "QC2",
     "uric acid": "QC2",
-
     # QC3
     "creatinine": "QC3",
     "microalbumin": "QC3",
 }
 
-helper_types = set(CAL_MAP.values()) | set(["QC1", "QC2", "QC3"])
+# --- classify component from item name ---
+def classify_component(item_name: str) -> str:
+    name = str(item_name).lower()
+    if "reagent" in name:
+        return "Reagent"
+    if "calibrator" in name or "calib" in name:
+        return "Calibrator"
+    if "qc" in name or "control" in name:
+        return "QC"
+    return "Other"
 
-df_plot = df.copy()
-df_plot["alert"] = df_plot["status"].map(
-    {"expired": "red", "expiring_soon": "yellow", "ok": "green"}
-)
-df_plot["type"] = df_plot["type"].astype(str)
+matrix_df_src = df.copy()
+matrix_df_src["component"] = matrix_df_src["item"].apply(classify_component)
+matrix_df_src["type"] = matrix_df_src["type"].astype(str)
 
-def make_pie(df_sub: pd.DataFrame, title: str):
-    if df_sub.empty:
-        return
+# We'll build status + quantity for each type and component
+components = ["Reagent", "Calibrator", "QC"]
 
-    df_sub = df_sub.copy()
-    df_sub["exp_str"] = df_sub["expiry_date"].dt.strftime("%Y-%m-%d").fillna("N/A")
-    df_sub["label"] = (
-        df_sub["item"].astype(str)
-        + " — Qty: " + df_sub["quantity"].astype(str)
-        + " — Exp: " + df_sub["exp_str"]
-    )
+# All assay types: those present in df plus mapping keys (so you see rows even if only calibrator/qc exists)
+types_in_data = set(matrix_df_src["type"].dropna().unique())
+test_types = sorted(types_in_data | set(CAL_MAP.keys()) | set(QC_MAP.keys()))
 
-    fig = px.pie(
-        df_sub,
-        names="item",
-        values=[1] * len(df_sub),   # equal slice size
-        color="alert",
-        title=title,
-        color_discrete_map={"red": "red", "yellow": "yellow", "green": "green"},
-    )
+def get_status_and_qty(sub: pd.DataFrame):
+    """Return (status, total_quantity) for a subset."""
+    if sub.empty:
+        return "missing", 0
+    qty = int(sub["quantity"].sum())
+    if (sub["status"] == "expired").any():
+        status = "expired"
+    elif (sub["status"] == "expiring_soon").any():
+        status = "expiring_soon"
+    else:
+        status = "ok"
+    return status, qty
 
-    fig.update_traces(
-        text=df_sub["label"],
-        textinfo="text",
-        hovertemplate="%{text}<extra></extra>",
-    )
-    st.plotly_chart(fig, use_container_width=True)
+rows = []
+for t in test_types:
+    row = {"Type": t}
 
-all_types = sorted(df_plot["type"].unique())
+    # ----- Reagent: only rows where type == t and component == Reagent -----
+    sub_reag = matrix_df_src[
+        (matrix_df_src["type"] == t) & (matrix_df_src["component"] == "Reagent")
+    ]
+    reag_status, reag_qty = get_status_and_qty(sub_reag)
+    row["Reagent_status"] = reag_status
+    row["Reagent_qty"] = reag_qty
 
-for t in all_types:
-    if t in helper_types:
-        continue
-
-    base = df_plot[df_plot["type"] == t]
-    if base.empty:
-        continue
-
-    combined = base.copy()
-
+    # ----- Calibrator: type == t and mapped Universal Calibrator if exists -----
+    sub_cal_local = matrix_df_src[
+        (matrix_df_src["type"] == t) & (matrix_df_src["component"] == "Calibrator")
+    ]
     if t in CAL_MAP:
-        combined = pd.concat([combined,
-                              df_plot[df_plot["type"] == CAL_MAP[t]]],
-                             ignore_index=True)
+        cal_type = CAL_MAP[t]
+        sub_cal_shared = matrix_df_src[
+            (matrix_df_src["type"] == cal_type) & (matrix_df_src["component"] == "Calibrator")
+        ]
+        sub_cal = pd.concat([sub_cal_local, sub_cal_shared])
+    else:
+        sub_cal = sub_cal_local
 
+    cal_status, cal_qty = get_status_and_qty(sub_cal)
+    row["Calibrator_status"] = cal_status
+    row["Calibrator_qty"] = cal_qty
+
+    # ----- QC: type == t and mapped QCx if exists -----
+    sub_qc_local = matrix_df_src[
+        (matrix_df_src["type"] == t) & (matrix_df_src["component"] == "QC")
+    ]
     if t in QC_MAP:
-        combined = pd.concat([combined,
-                              df_plot[df_plot["type"] == QC_MAP[t]]],
-                             ignore_index=True)
+        qc_type = QC_MAP[t]
+        sub_qc_shared = matrix_df_src[
+            (matrix_df_src["type"] == qc_type) & (matrix_df_src["component"] == "QC")
+        ]
+        sub_qc = pd.concat([sub_qc_local, sub_qc_shared])
+    else:
+        sub_qc = sub_qc_local
 
-    make_pie(combined, f"Type: {t}")
+    qc_status, qc_qty = get_status_and_qty(sub_qc)
+    row["QC_status"] = qc_status
+    row["QC_qty"] = qc_qty
+
+    rows.append(row)
+
+status_matrix = pd.DataFrame(rows).set_index("Type")
+
+# Replace status text with symbols, keep qty as numbers
+status_display = status_matrix.copy()
+status_display[["Reagent_status", "Calibrator_status", "QC_status"]] = (
+    status_display[["Reagent_status", "Calibrator_status", "QC_status"]].replace(
+        {
+            "ok": "🟢 OK",
+            "expiring_soon": "🟡 Soon",
+            "expired": "🔴 Expired",
+            "missing": "⚪ Missing",
+        }
+    )
+)
+
+st.subheader("Reagent / Calibrator / QC Status with Quantities")
+st.dataframe(status_display, use_container_width=True)
+
+st.markdown(
+    """
+**Legend:**  
+🟢 OK – available • 🟡 Soon – expiring in 30 days  
+🔴 Expired – expired • ⚪ Missing – no item in inventory  
+
+Columns `_qty` show the **total quantity** of that component (including shared Universal Calibrators and QC1/2/3 when mapped).
+"""
+)
+
+
