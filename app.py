@@ -109,19 +109,36 @@ st.markdown("---")
 # ============================================================
 st.header("Inventory Table (Editable Quantities)")
 
+# 1. Display the editable subset of the DataFrame.
+# edit_df is the new DataFrame containing user-modified values.
 edit_df = st.data_editor(
     df[["platform", "type", "item", "cat_no", "quantity", "expiry_date", "status"]],
     num_rows="dynamic"
 )
 
-# Update the quantity back into df
-df["quantity"] = edit_df["quantity"]
+# 2. Re-calculate status based on the data edited by the user.
+today = pd.to_datetime(datetime.now().date())
+edit_df["expiry_date"] = pd.to_datetime(edit_df["expiry_date"], errors="coerce")
+
+# Recalculate 'status' column
+edit_df["status"] = "ok"
+expired = edit_df["expiry_date"].notna() & (edit_df["expiry_date"] < today)
+exp_soon = edit_df["expiry_date"].notna() & (edit_df["expiry_date"] <= today + pd.Timedelta(days=30))
+
+edit_df.loc[expired, "status"] = "expired"
+edit_df.loc[exp_soon & ~expired, "status"] = "expiring_soon"
+
+# 3. Use the corrected, edited data for all subsequent steps (df is updated).
+df = edit_df.copy()
 
 # ============================================================
-# STEP 7 — DOWNLOAD UPDATED EXCEL
+# STEP 7 — DOWNLOAD UPDATED EXCEL (Now using the corrected `df`)
 # ============================================================
 buffer = io.BytesIO()
+# The issue was likely not having a writer object defined in the original traceback's context.
+# Your current implementation correctly defines it using a context manager, which is best practice.
 with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+    # Use the fully corrected `df` for the download
     df.to_excel(writer, index=False, sheet_name="inventory")
 buffer.seek(0)
 
