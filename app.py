@@ -226,9 +226,77 @@ st.download_button(
 st.markdown("---")
 
 # ============================================================
-# STEP 9 — PIE CHARTS WITH CORRECT GROUPING & HORIZONTAL LABELS
+# STEP 9 — STATUS MATRIX (Reagent / Calibrator / QC)
 # ============================================================
-st.header("Inventory Status Breakdown by Type")
+
+st.header("Status Matrix — Reagent / Calibrator / QC by Test Type")
+
+# --- classify component from item name ---
+def classify_component(item_name: str) -> str:
+    name = str(item_name).lower()
+    if "reagent" in name:
+        return "Reagent"
+    if "calibrator" in name or "calib" in name:
+        return "Calibrator"
+    if "qc" in name or "control" in name:
+        return "QC"
+    return "Other"
+
+matrix_df_src = df.copy()
+matrix_df_src["component"] = matrix_df_src["item"].apply(classify_component)
+
+# only keep the 3 essential components
+matrix_df_src = matrix_df_src[matrix_df_src["component"].isin(["Reagent", "Calibrator", "QC"])]
+
+test_types = sorted(matrix_df_src["type"].dropna().astype(str).unique())
+components = ["Reagent", "Calibrator", "QC"]
+
+rows = []
+for t in test_types:
+    row = {"Type": t}
+    for comp in components:
+        sub = matrix_df_src[
+            (matrix_df_src["type"].astype(str) == t) &
+            (matrix_df_src["component"] == comp)
+        ]
+        if sub.empty:
+            status = "missing"
+        else:
+            if (sub["status"] == "expired").any():
+                status = "expired"
+            elif (sub["status"] == "expiring_soon").any():
+                status = "expiring_soon"
+            else:
+                status = "ok"
+        row[comp] = status
+    rows.append(row)
+
+status_matrix = pd.DataFrame(rows).set_index("Type")
+
+# nice symbols for readability
+status_display = status_matrix.replace({
+    "ok": "🟢 OK",
+    "expiring_soon": "🟡 Soon",
+    "expired": "🔴 Expired",
+    "missing": "⚪ Missing"
+})
+
+st.dataframe(status_display, use_container_width=True)
+
+st.markdown("""
+**Legend:**  
+🟢 OK = valid and available • 🟡 Soon = expiring in ≤ 30 days  
+🔴 Expired = past expiration • ⚪ Missing = no item found for that component
+""")
+
+st.markdown("---")
+
+
+# ============================================================
+# STEP 10 — PIE CHARTS WITH CORRECT GROUPING & HORIZONTAL LABELS
+# ============================================================
+
+st.header("Inventory Status Breakdown by Type (Pie Charts)")
 
 # ---- Calibrator mapping: for each assay type, which Universal Calibrator type to add ----
 CAL_MAP = {
@@ -236,7 +304,9 @@ CAL_MAP = {
     "uric 2": "Universal Calibrator 1",
     "TPRO2": "Universal Calibrator 1",
     "ALT2": "Universal Calibrator 1",
+
     "HDL": "Universal Calibrator 2",
+
     "Chole": "Universal Calibrator 3",
     "Creatinine": "Universal Calibrator 3",
     "glucose": "Universal Calibrator 3",
@@ -278,16 +348,16 @@ QC_MAP = {
     "microalbumin": "QC3",
 }
 
-# Add alert color for plotting
+# prepare df_plot with colors
 df_plot = df.copy()
-df_plot["alert"] = df_plot["status"].map(
-    {"expired": "red", "expiring_soon": "yellow", "ok": "green"}
-)
-
-# Ensure 'type' is string for grouping
+df_plot["alert"] = df_plot["status"].map({
+    "expired": "red",
+    "expiring_soon": "yellow",
+    "ok": "green"
+})
 df_plot["type"] = df_plot["type"].astype(str)
 
-def make_pie(df_sub, title):
+def make_pie(df_sub: pd.DataFrame, title: str):
     """Create a pie chart with equal slices and horizontal labels."""
     if df_sub.empty:
         return
@@ -296,26 +366,26 @@ def make_pie(df_sub, title):
     df_sub["exp_str"] = df_sub["expiry_date"].dt.strftime("%Y-%m-%d").fillna("N/A")
     df_sub["label"] = (
         df_sub["item"].astype(str)
-        + " — Qty: "
-        + df_sub["quantity"].astype(str)
-        + " — Exp: "
-        + df_sub["exp_str"]
+        + " — Qty: " + df_sub["quantity"].astype(str)
+        + " — Exp: " + df_sub["exp_str"]
     )
 
     fig = px.pie(
         df_sub,
         names="item",
-        values=[1] * len(df_sub),  # equal slice sizes
+        values=[1] * len(df_sub),  # each item gets equal slice size
         color="alert",
         title=title,
         color_discrete_map={"red": "red", "yellow": "yellow", "green": "green"},
     )
+
     fig.update_traces(
         text=df_sub["label"],
         textinfo="text",
         hovertemplate="%{text}<extra></extra>",
     )
     st.plotly_chart(fig, use_container_width=True)
+
 
 all_types = sorted(df_plot["type"].dropna().unique())
 
@@ -326,17 +396,16 @@ for t in all_types:
 
     combined = base.copy()
 
-    # Add Universal Calibrator if mapping exists
+    # add Universal Calibrator if mapping exists for this test type
     if t in CAL_MAP:
         cal_type = CAL_MAP[t]
         cal_rows = df_plot[df_plot["type"] == cal_type]
         combined = pd.concat([combined, cal_rows], ignore_index=True)
 
-    # Add QC if mapping exists
+    # add QC if mapping exists for this test type
     if t in QC_MAP:
         qc_type = QC_MAP[t]
         qc_rows = df_plot[df_plot["type"] == qc_type]
         combined = pd.concat([combined, qc_rows], ignore_index=True)
 
     make_pie(combined, f"Type: {t}")
-
