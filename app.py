@@ -174,62 +174,58 @@ st.download_button(
 st.markdown("---")
 
 # ============================================================
-# STEP 9 — PIE CHARTS (Modified to show Item Name, Quantity, and Color-Coded)
+# STEP 9 — PIE CHARTS (Revised for Group by Type, Item/Qty/Date slices, and Color-Code)
 # ============================================================
-st.header("Expired and Expiring Soon Item Breakdown")
+st.header("Inventory Status Breakdown by Type")
 
-# --- 9a. Expired Items Breakdown (Red) ---
-expired_items = df[df["status"] == "expired"]
-if not expired_items.empty:
-    # Group by item/cat_no and sum quantities
-    expired_summary = expired_items.groupby(["item", "cat_no"])["quantity"].sum().reset_index()
-    # Create a combined label for the pie chart slices (Name + Cat No for clarity)
-    expired_summary["label"] = expired_summary["item"] + " (" + expired_summary["cat_no"] + ")"
+# Filter out rows with missing item names or zero quantity before plotting
+df_plot = df[df['item'].notna() & (df['quantity'] > 0)].copy()
+types = sorted(df_plot["type"].dropna().unique().astype(str))
 
-    fig_expired = px.pie(
-        expired_summary,
-        names="label",
-        values="quantity",
-        title="Total Quantity of Expired Items by Name (Red Alert)",
-        # Set all slices to red for attention
-        color_discrete_sequence=['red'] 
+if not types:
+    st.info("No items available for charting.")
+
+for t in types:
+    sub = df_plot[df_plot["type"].astype(str) == t].copy()
+
+    # Aggregate: sum quantity, and find the minimum (earliest) expiry date for each unique item/alert combination
+    summary = sub.groupby(["item", "cat_no", "alert"]).agg(
+        quantity=('quantity', 'sum'),
+        expiry_date=('expiry_date', 'min') # Finds the earliest expiration date for the item
+    ).reset_index()
+
+    # Create the text to display on the chart slice: Item Name + Qty + Date
+    # Format the date nicely for display
+    summary["date_str"] = summary["expiry_date"].dt.strftime('%Y-%m-%d').fillna('N/A')
+    
+    # Combine item name, quantity, and expiration date for the custom text label
+    summary["display_text"] = (
+        summary["item"].astype(str) + " (" + summary["cat_no"].astype(str) + ")" +
+        "<br>Qty: " + summary["quantity"].astype(str) +
+        "<br>Exp: " + summary["date_str"]
     )
     
-    # Set textinfo to explicitly show 'label' (item description) and 'value' (quantity).
-    fig_expired.update_traces(
-        textinfo='label+value', 
-        hovertemplate='%{label}<br>Quantity: %{value}<extra></extra>'
-    )
-    
-    st.plotly_chart(fig_expired, use_container_width=True)
-else:
-    st.info("No items are currently reported as Expired. 🎉")
+    # Use a generic name for the slice identity, but 'display_text' for what is shown
+    summary["label"] = summary["item"].astype(str) 
 
-st.markdown("---")
-
-# --- 9b. Expiring Soon Items Breakdown (Yellow) ---
-exp_soon_items = df[df["status"] == "expiring_soon"]
-if not exp_soon_items.empty:
-    # Group by item/cat_no and sum quantities
-    exp_soon_summary = exp_soon_items.groupby(["item", "cat_no"])["quantity"].sum().reset_index()
-    # Create a combined label for the pie chart slices (Name + Cat No for clarity)
-    exp_soon_summary["label"] = exp_soon_summary["item"] + " (" + exp_soon_summary["cat_no"] + ")"
-
-    fig_exp_soon = px.pie(
-        exp_soon_summary,
-        names="label",
-        values="quantity",
-        title="Total Quantity of Items Expiring in 30 Days by Name (Yellow Alert)",
-        # Set all slices to yellow for attention
-        color_discrete_sequence=['yellow'] 
+    fig = px.pie(
+        summary,
+        names="label",        # Used for slice key, hover, and legend
+        values="quantity",    # Slice size is Quantity
+        color="alert",        # Color slices by the alert status
+        title=f"Type: {t} — Item Quantity Breakdown",
+        color_discrete_map={  # Color mapping
+            "red": "red",
+            "yellow": "yellow",
+            "green": "green"
+        }
     )
-    
-    # Set textinfo to explicitly show 'label' (item description) and 'value' (quantity).
-    fig_exp_soon.update_traces(
-        textinfo='label+value', 
-        hovertemplate='%{label}<br>Quantity: %{value}<extra></extra>'
+
+    # Use the custom 'display_text' for the slice text, and explicitly remove percentage
+    fig.update_traces(
+        text=summary["display_text"], # Pass the custom text column
+        textinfo='text',             # Display the custom text
+        hovertemplate='%{text}<extra></extra>' # Show only the custom text on hover
     )
-    
-    st.plotly_chart(fig_exp_soon, use_container_width=True)
-else:
-    st.info("No items are currently reported as Expiring Soon. ✅")
+
+    st.plotly_chart(fig, use_container_width=True)
