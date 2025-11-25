@@ -3,20 +3,18 @@ from datetime import datetime, timedelta
 import streamlit as st
 import plotly.express as px
 import os
-import io
 from io import BytesIO
-from pathlib import Path
-import base64
-# SIMPLE LOGIN / PASSCODE PROTECTION
-# -------------------------------------------------
-PASSCODE = "mmcccl2025"  
 
-# Initialize session state
+# ===========================
+# SIMPLE LOGIN / PASSCODE
+# ===========================
+PASSCODE = "mmcccl2025"
+
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
-# Login form
 if not st.session_state.authenticated:
+    st.set_page_config(page_title="MMCCCL Laboratory Supplies Tracker", layout="wide")
     st.title("🔒 MMCCCL lab supply tracker")
 
     pass_input = st.text_input("Enter Passcode:", type="password")
@@ -29,53 +27,59 @@ if not st.session_state.authenticated:
         else:
             st.error("❌ Incorrect passcode. Please try again.")
 
-    st.stop()  # Stop the script here if not authenticated
+    st.stop()
 
-
-# -------------------------------------------------
+# ===========================
 # PAGE SETUP
+# ===========================
 st.set_page_config(page_title="MMCCCL Laboratory Supplies Tracker", layout="wide")
 
 EXCEL_PATH = "MMCCCL_supply_Nov25-2025.xlsx"
-
 
 # --- Header layout ---
 col1, col2 = st.columns([1, 3])
 
 with col1:
-    st.image("mmcccl_logo.png", use_column_width=True)
+    # logo file must be in same folder as app.py
+    if os.path.exists("mmcccl_logo.png"):
+        st.image("mmcccl_logo.png", use_column_width=True)
+    else:
+        st.write("mmcccl_logo.png not found in repo.")
 
 with col2:
-    st.markdown("""
+    st.markdown(
+        """
         <h1 style="font-size: 50px; margin-bottom: 0px;">
             MMCCCL Laboratory Supplies Tracker
         </h1>
         <p style="font-size: 25px; margin-top: -10px; color: #555;">
             Inventory Management Dashboard
         </p>
-    """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
+
 st.markdown("---")
-# ============================================================
-# STEP 1 — UPLOAD EXCEL FILE
-# ============================================================
-if os.path.exists(EXCEL_PATH):
-    df = pd.read_excel(EXCEL_PATH)
-    st.success(f"Loaded file: {EXCEL_PATH}")
 
-    # Display data
-    st.subheader("📊 Supply Inventory Data")
-    st.dataframe(df, use_container_width=True)
-
-else:
+# ============================================================
+# STEP 1 — LOAD EXCEL FILE FROM REPO
+# ============================================================
+if not os.path.exists(EXCEL_PATH):
     st.error(f"❌ Excel file not found in repo: {EXCEL_PATH}")
     st.info("Make sure the file is inside your repository root in GitHub Codespaces.")
+    st.stop()
 
+df = pd.read_excel(EXCEL_PATH)
+df_orig = df.copy()  # for auto-detection helper
+
+st.subheader("📊 Supply Inventory Data (Raw)")
+st.dataframe(df, use_container_width=True)
 
 # ============================================================
 # STEP 2 — COLUMN AUTO-DETECTION HELPERS
 # ============================================================
-def find_col(df, candidates):
-    cols = df.columns.tolist()
+def find_col(df_in, candidates):
+    cols = df_in.columns.tolist()
     lower = {c.lower(): c for c in cols}
     for cand in candidates:
         if cand.lower() in lower:
@@ -91,7 +95,7 @@ auto_type = find_col(df_orig, ["type", "category"])
 auto_item = find_col(df_orig, ["item", "description", "item_description"])
 auto_catno = find_col(df_orig, ["cat_no", "catalog", "catalog_number"])
 auto_qty = find_col(df_orig, ["quantity", "qty"])
-auto_exp = find_col(df_orig, ["expiry", "expiration", "exp_date"])
+auto_exp = find_col(df_orig, ["expiry", "expiration", "exp_date", "expiry_date"])
 
 # ============================================================
 # STEP 3 — SIDEBAR COLUMN MAPPING
@@ -113,14 +117,16 @@ for col in [platform_col, type_col, item_col, cat_col, qty_col, expiry_col]:
         df[col] = pd.NA
 
 # Normalize names
-df = df.rename(columns={
-    platform_col: "platform",
-    type_col: "type",
-    item_col: "item",
-    cat_col: "cat_no",
-    qty_col: "quantity",
-    expiry_col: "expiry_date"
-})
+df = df.rename(
+    columns={
+        platform_col: "platform",
+        type_col: "type",
+        item_col: "item",
+        cat_col: "cat_no",
+        qty_col: "quantity",
+        expiry_col: "expiry_date",
+    }
+)
 
 df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce").fillna(0).astype(int)
 
@@ -132,11 +138,13 @@ df["expiry_date"] = pd.to_datetime(df["expiry_date"], errors="coerce")
 # STEP 4 — STATUS LABELS
 # ============================================================
 df["status"] = "ok"
-expired = df["expiry_date"].notna() & (df["expiry_date"] < today)
-exp_soon = df["expiry_date"].notna() & (df["expiry_date"] <= today + pd.Timedelta(days=30))
+expired_mask = df["expiry_date"].notna() & (df["expiry_date"] < today)
+exp_soon_mask = df["expiry_date"].notna() & (
+    df["expiry_date"] <= today + pd.Timedelta(days=30)
+)
 
-df.loc[expired, "status"] = "expired"
-df.loc[exp_soon & ~expired, "status"] = "expiring_soon"
+df.loc[expired_mask, "status"] = "expired"
+df.loc[exp_soon_mask & ~expired_mask, "status"] = "expiring_soon"
 
 # Sort
 df = df.sort_values(by=["platform", "type", "item"], na_position="last")
@@ -147,10 +155,10 @@ df = df.sort_values(by=["platform", "type", "item"], na_position="last")
 st.subheader("Summary")
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total Items", df["item"].nunique())
+col1.metric("Total Items", int(df["item"].nunique()))
 col2.metric("Total Quantity", int(df["quantity"].sum()))
-col3.metric("Expired", (df["status"] == "expired").sum())
-col4.metric("Expiring Soon", (df["status"] == "expiring_soon").sum())
+col3.metric("Expired", int((df["status"] == "expired").sum()))
+col4.metric("Expiring Soon", int((df["status"] == "expiring_soon").sum()))
 
 st.markdown("---")
 
@@ -159,36 +167,30 @@ st.markdown("---")
 # ============================================================
 st.header("Inventory Table (Editable Quantities)")
 
-# 1. Display the editable subset of the DataFrame.
-# edit_df is the new DataFrame containing user-modified values.
 edit_df = st.data_editor(
     df[["platform", "type", "item", "cat_no", "quantity", "expiry_date", "status"]],
-    num_rows="dynamic"
+    num_rows="dynamic",
 )
 
-# 2. Re-calculate status based on the data edited by the user.
-today = pd.to_datetime(datetime.now().date())
+# Recalculate expiration status based on edited data
 edit_df["expiry_date"] = pd.to_datetime(edit_df["expiry_date"], errors="coerce")
 
-# Recalculate 'status' column
 edit_df["status"] = "ok"
-expired = edit_df["expiry_date"].notna() & (edit_df["expiry_date"] < today)
-exp_soon = edit_df["expiry_date"].notna() & (edit_df["expiry_date"] <= today + pd.Timedelta(days=30))
+expired_mask = edit_df["expiry_date"].notna() & (edit_df["expiry_date"] < today)
+exp_soon_mask = edit_df["expiry_date"].notna() & (
+    edit_df["expiry_date"] <= today + pd.Timedelta(days=30)
+)
 
-edit_df.loc[expired, "status"] = "expired"
-edit_df.loc[exp_soon & ~expired, "status"] = "expiring_soon"
+edit_df.loc[expired_mask, "status"] = "expired"
+edit_df.loc[exp_soon_mask & ~expired_mask, "status"] = "expiring_soon"
 
-# 3. Use the corrected, edited data for all subsequent steps (df is updated).
 df = edit_df.copy()
 
 # ============================================================
-# STEP 7 — DOWNLOAD UPDATED EXCEL (Now using the corrected `df`)
+# STEP 7 — DOWNLOAD UPDATED EXCEL
 # ============================================================
-buffer = io.BytesIO()
-# The issue was likely not having a writer object defined in the original traceback's context.
-# Your current implementation correctly defines it using a context manager, which is best practice.
+buffer = BytesIO()
 with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-    # Use the fully corrected `df` for the download
     df.to_excel(writer, index=False, sheet_name="inventory")
 buffer.seek(0)
 
@@ -196,21 +198,21 @@ st.download_button(
     "Download Updated Inventory Excel",
     data=buffer,
     file_name="inventory_updated.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
 
 st.markdown("---")
 
-#STEP 8 — EXPIRING SOON LIST DOWNLOAD (item + cat_no + quantity)
 # ============================================================
-# Filter and select item, cat_no, and quantity
+# STEP 8 — EXPIRING SOON LIST DOWNLOAD (item + cat_no + quantity)
+# ============================================================
 exp_soon_df = df[df["status"] == "expiring_soon"][["item", "cat_no", "quantity"]]
-
-# Aggregate quantity for display/download if the same item/cat_no appears multiple times
-exp_soon_grouped = exp_soon_df.groupby(["item", "cat_no"]).agg({"quantity": "sum"}).reset_index()
+exp_soon_grouped = (
+    exp_soon_df.groupby(["item", "cat_no"]).agg({"quantity": "sum"}).reset_index()
+)
 
 st.subheader("Items Expiring in 30 Days (Item Name and Total Quantity)")
-st.dataframe(exp_soon_grouped, use_container_width=True) # Use the grouped data
+st.dataframe(exp_soon_grouped, use_container_width=True)
 
 csv_data = exp_soon_grouped.to_csv(index=False).encode("utf-8")
 
@@ -218,127 +220,123 @@ st.download_button(
     "Download Expiring Soon Items (item + cat_no + qty)",
     data=csv_data,
     file_name="expiring_items.csv",
-    mime="text/csv"
+    mime="text/csv",
 )
 
 st.markdown("---")
 
 # ============================================================
-# STEP 9 — PIE CHARTS (Clean Version, Equal Slices)
+# STEP 9 — PIE CHARTS WITH CORRECT GROUPING & HORIZONTAL LABELS
 # ============================================================
-
 st.header("Inventory Status Breakdown by Type")
 
-# ------------ Group Definitions ----------------
-CAL_GROUPS = {
-    "Universal Calibrator 1": ["AST 2", "uric 2", "TPRO2", "ALT2"],
-    "Universal Calibrator 2": ["HDL"],
-    "Universal Calibrator 3": [
-        "Chole", "Creatinine", "glucose", "triglycerides", "urea", "total protein 2"
-    ]
+# ---- Calibrator mapping: for each assay type, which Universal Calibrator type to add ----
+CAL_MAP = {
+    "AST 2": "Universal Calibrator 1",
+    "uric 2": "Universal Calibrator 1",
+    "TPRO2": "Universal Calibrator 1",
+    "ALT2": "Universal Calibrator 1",
+    "HDL": "Universal Calibrator 2",
+    "Chole": "Universal Calibrator 3",
+    "Creatinine": "Universal Calibrator 3",
+    "glucose": "Universal Calibrator 3",
+    "triglycerides": "Universal Calibrator 3",
+    "urea": "Universal Calibrator 3",
+    "total protein 2": "Universal Calibrator 3",
 }
 
-QC_GROUPS = {
-    "QC1": ["FSH", "Free T3", "Free T4", "Testo", "TSH", "Total T4", "Total T3", "Vitamiin D"],
-    "QC2": [
-        "alblumin BCP", "ALKP", "ALT", "AST", "Bilirubin", "calcium",
-        "CO2", "ICT", "Choles", "CRP", "Glucose", "total protein",
-        "Rheumatoid", "Trigly", "urea nitrogen", "uric acid"
-    ],
-    "QC3": ["creatinine", "microalbumin"]
+# ---- QC mapping: for each assay type, which QC type to add ----
+QC_MAP = {
+    # QC1
+    "FSH": "QC1",
+    "Free T3": "QC1",
+    "Free T4": "QC1",
+    "Testo": "QC1",
+    "TSH": "QC1",
+    "Total T4": "QC1",
+    "Total T3": "QC1",
+    "Vitamiin D": "QC1",
+    # QC2
+    "alblumin BCP": "QC2",
+    "ALKP": "QC2",
+    "ALT": "QC2",
+    "AST": "QC2",
+    "Bilirubin": "QC2",
+    "calcium": "QC2",
+    "CO2": "QC2",
+    "ICT": "QC2",
+    "Choles": "QC2",
+    "CRP": "QC2",
+    "Glucose": "QC2",
+    "total protein": "QC2",
+    "Rheumatoid": "QC2",
+    "Trigly": "QC2",
+    "urea nitrogen": "QC2",
+    "uric acid": "QC2",
+    # QC3
+    "creatinine": "QC3",
+    "microalbumin": "QC3",
 }
 
-# Add alert color
+# Add alert color for plotting
 df_plot = df.copy()
-df_plot["alert"] = df_plot["status"].map({
-    "expired": "red",
-    "expiring_soon": "yellow",
-    "ok": "green"
-})
+df_plot["alert"] = df_plot["status"].map(
+    {"expired": "red", "expiring_soon": "yellow", "ok": "green"}
+)
 
+# Ensure 'type' is string for grouping
+df_plot["type"] = df_plot["type"].astype(str)
 
-# ------------ Helper function to build pie chart -------------
-def make_pie_chart(df_sub, title):
+def make_pie(df_sub, title):
+    """Create a pie chart with equal slices and horizontal labels."""
     if df_sub.empty:
         return
 
-    # Build display text
     df_sub = df_sub.copy()
     df_sub["exp_str"] = df_sub["expiry_date"].dt.strftime("%Y-%m-%d").fillna("N/A")
-
-    df_sub["label_text"] = (
+    df_sub["label"] = (
         df_sub["item"].astype(str)
-        + "<br>Qty: " + df_sub["quantity"].astype(str)
-        + "<br>Exp: " + df_sub["exp_str"]
+        + " — Qty: "
+        + df_sub["quantity"].astype(str)
+        + " — Exp: "
+        + df_sub["exp_str"]
     )
 
-    # Equal-sized slices → values=1
     fig = px.pie(
         df_sub,
         names="item",
-        values=[1] * len(df_sub),
+        values=[1] * len(df_sub),  # equal slice sizes
         color="alert",
         title=title,
-        color_discrete_map={"red": "red", "yellow": "yellow", "green": "green"}
+        color_discrete_map={"red": "red", "yellow": "yellow", "green": "green"},
     )
-
     fig.update_traces(
-        text=df_sub["label_text"],
+        text=df_sub["label"],
         textinfo="text",
-        hovertemplate="%{text}<extra></extra>"
+        hovertemplate="%{text}<extra></extra>",
     )
-
     st.plotly_chart(fig, use_container_width=True)
 
+all_types = sorted(df_plot["type"].dropna().unique())
 
-# ============================================================
-# 1️⃣ PIE CHARTS FOR UNIVERSAL CALIBRATOR GROUPS
-# ============================================================
-st.subheader("Universal Calibrator Charts")
-
-for group_name, type_list in CAL_GROUPS.items():
-    sub = df_plot[df_plot["type"].isin(type_list)]
-    make_pie_chart(sub, group_name)
-
-
-# ============================================================
-# 2️⃣ PIE CHARTS FOR QC GROUPS (Added into Each Type’s Chart)
-# ============================================================
-
-st.subheader("Quality Control (QC) Charts")
-
-all_qc_types = set(sum(QC_GROUPS.values(), []))  # flatten list
-
-for t in sorted(all_qc_types):
-    # Items of this specific type
+for t in all_types:
     base = df_plot[df_plot["type"] == t]
-
     if base.empty:
         continue
 
-    # Add QC items depending on which group this type belongs to
-    qc_additions = pd.DataFrame()
+    combined = base.copy()
 
-    for qc_group, qc_types in QC_GROUPS.items():
-        if t in qc_types:
-            qc_additions = pd.concat([
-                qc_additions,
-                df_plot[df_plot["type"] == qc_group]
-            ])
+    # Add Universal Calibrator if mapping exists
+    if t in CAL_MAP:
+        cal_type = CAL_MAP[t]
+        cal_rows = df_plot[df_plot["type"] == cal_type]
+        combined = pd.concat([combined, cal_rows], ignore_index=True)
 
-    combined = pd.concat([base, qc_additions])
-    make_pie_chart(combined, f"{t} (with QC items)")
+    # Add QC if mapping exists
+    if t in QC_MAP:
+        qc_type = QC_MAP[t]
+        qc_rows = df_plot[df_plot["type"] == qc_type]
+        combined = pd.concat([combined, qc_rows], ignore_index=True)
 
+    make_pie(combined, f"Type: {t}")
 
-# ============================================================
-# 3️⃣ PIE CHARTS FOR REMAINING INDIVIDUAL TYPES
-# ============================================================
-
-st.subheader("Other Individual Type Charts")
-
-used_types = set(sum(CAL_GROUPS.values(), [])) | set(all_qc_types)
-remaining = sorted(set(df_plot["type"].unique()) - used_types)
-
-for t in remaining:
-    sub = df_plot[df_plot["type"] == t]
-    make_pie_chart(sub, t)
