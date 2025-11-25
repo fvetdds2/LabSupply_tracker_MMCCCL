@@ -235,18 +235,18 @@ st.header("Status Matrix — Reagent / Calibrator / QC by Test Type")
 
 CAL_MAP = {
     # Universal Calibrator 1
-    "AST 2": "Universal Calibrator 1",
-    "uric 2": "Universal Calibrator 1",
-    "TPRO2": "Universal Calibrator 1",
+    "AST2": "Universal Calibrator 1",
+    "Uric Acid 2": "Universal Calibrator 1",
+    "total Protein2": "Universal Calibrator 1",
     "ALT2": "Universal Calibrator 1",
     # Universal Calibrator 2
-    "HDL": "Universal Calibrator 2",
+    "Ultra HDL": "Universal Calibrator 2",
     # Universal Calibrator 3
     "Chol": "Universal Calibrator 3",
     "Creatinine": "Universal Calibrator 3",
     "glucose": "Universal Calibrator 3",
-    "triglycerides": "Universal Calibrator 3",
-    "urea": "Universal Calibrator 3",
+    "TRIG": "Universal Calibrator 3",
+    "Urea": "Universal Calibrator 3",
     "Albumin BCP": "Universal Calibrator 3",
     "total protein 2": "Universal Calibrator 3",
 }
@@ -262,7 +262,7 @@ QC_MAP = {
     "Total T3": "QC1",
     "Vitamin D": "QC1",
     # QC2
-    "Alblumin BCP": "QC2",
+    "Albumin BCP": "QC2",
     "ALKP": "QC2",
     "ALT2": "QC2",
     "AST2": "QC2",
@@ -273,14 +273,15 @@ QC_MAP = {
     "Choles": "QC2",
     "CRP": "QC2",
     "Glucose": "QC2",
-    "total Protein2": "QC2",
+    "Total Protein2": "QC2",
     "Rheumatoid": "QC2",
-    "Trigly": "QC2",
-    "urea nitrogen": "QC2",
-    "uric acid": "QC2",
+    "TRIG": "QC2",
+    "Urea": "QC2",
+    "Ultra HDL": "QC2",
+    "Uric Acid 2": "QC2",
     # QC3
     "Creatinine": "QC3",
-    "microalbumin": "QC3",
+    "Microalbumin": "QC3",
 }
 
 # --- classify component from item name ---
