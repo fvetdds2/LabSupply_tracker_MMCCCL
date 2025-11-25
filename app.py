@@ -40,7 +40,6 @@ EXCEL_PATH = "MMCCCL_supply_Nov25-2025.xlsx"
 col1, col2 = st.columns([1, 3])
 
 with col1:
-    # logo file must be in same folder as app.py
     if os.path.exists("mmcccl_logo.png"):
         st.image("mmcccl_logo.png", use_column_width=True)
     else:
@@ -70,7 +69,7 @@ if not os.path.exists(EXCEL_PATH):
     st.stop()
 
 df = pd.read_excel(EXCEL_PATH)
-df_orig = df.copy()  # for auto-detection helper
+df_orig = df.copy()
 
 st.subheader("📊 Supply Inventory Data (Raw)")
 st.dataframe(df, use_container_width=True)
@@ -111,12 +110,10 @@ expiry_col = st.sidebar.text_input("Expiry date column", value=auto_exp or "expi
 
 df = df_orig.copy()
 
-# If columns missing, create them
 for col in [platform_col, type_col, item_col, cat_col, qty_col, expiry_col]:
     if col not in df.columns:
         df[col] = pd.NA
 
-# Normalize names
 df = df.rename(
     columns={
         platform_col: "platform",
@@ -129,6 +126,9 @@ df = df.rename(
 )
 
 df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce").fillna(0).astype(int)
+
+# 🔴 IMPORTANT: strip spaces from type so "ALT2" and "ALT2 " become the same
+df["type"] = df["type"].astype(str).str.strip()
 
 # Parse expiry dates
 today = pd.to_datetime(datetime.now().date())
@@ -146,7 +146,6 @@ exp_soon_mask = df["expiry_date"].notna() & (
 df.loc[expired_mask, "status"] = "expired"
 df.loc[exp_soon_mask & ~expired_mask, "status"] = "expiring_soon"
 
-# Sort
 df = df.sort_values(by=["platform", "type", "item"], na_position="last")
 
 # ============================================================
@@ -172,7 +171,6 @@ edit_df = st.data_editor(
     num_rows="dynamic",
 )
 
-# Recalculate expiration status based on edited data
 edit_df["expiry_date"] = pd.to_datetime(edit_df["expiry_date"], errors="coerce")
 
 edit_df["status"] = "ok"
@@ -183,6 +181,9 @@ exp_soon_mask = edit_df["expiry_date"].notna() & (
 
 edit_df.loc[expired_mask, "status"] = "expired"
 edit_df.loc[exp_soon_mask & ~expired_mask, "status"] = "expiring_soon"
+
+# 🔴 strip spaces again in case user edited types
+edit_df["type"] = edit_df["type"].astype(str).str.strip()
 
 df = edit_df.copy()
 
@@ -204,7 +205,7 @@ st.download_button(
 st.markdown("---")
 
 # ============================================================
-# STEP 8 — EXPIRING SOON LIST DOWNLOAD (item + cat_no + quantity)
+# STEP 8 — EXPIRING SOON LIST DOWNLOAD
 # ============================================================
 exp_soon_df = df[df["status"] == "expiring_soon"][["item", "cat_no", "quantity"]]
 exp_soon_grouped = (
@@ -231,17 +232,12 @@ st.markdown("---")
 
 st.header("Status Matrix — Reagent / Calibrator / QC by Test Type")
 
-# --- Mappings for shared Universal Calibrators and QC types ---
-
 CAL_MAP = {
-    # Universal Calibrator 1
     "AST2": "Universal Calibrator 1",
     "Uric Acid 2": "Universal Calibrator 1",
     "total Protein2": "Universal Calibrator 1",
     "ALT2": "Universal Calibrator 1",
-    # Universal Calibrator 2
     "Ultra HDL": "Universal Calibrator 2",
-    # Universal Calibrator 3
     "Chol": "Universal Calibrator 3",
     "Creatinine": "Universal Calibrator 3",
     "glucose": "Universal Calibrator 3",
@@ -252,7 +248,6 @@ CAL_MAP = {
 }
 
 QC_MAP = {
-    # QC1
     "FSH": "QC1",
     "Free T3": "QC1",
     "Free T4": "QC1",
@@ -261,7 +256,6 @@ QC_MAP = {
     "Total T4": "QC1",
     "Total T3": "QC1",
     "Vitamin D": "QC1",
-    # QC2
     "Albumin BCP": "QC2",
     "ALKP": "QC2",
     "ALT2": "QC2",
@@ -279,12 +273,10 @@ QC_MAP = {
     "Urea": "QC2",
     "Ultra HDL": "QC2",
     "Uric Acid 2": "QC2",
-    # QC3
     "Creatinine": "QC3",
     "Microalbumin": "QC3",
 }
 
-# --- classify component from item name ---
 def classify_component(item_name: str) -> str:
     name = str(item_name).lower()
     if "reagent" in name:
@@ -297,17 +289,10 @@ def classify_component(item_name: str) -> str:
 
 matrix_df_src = df.copy()
 matrix_df_src["component"] = matrix_df_src["item"].apply(classify_component)
-matrix_df_src["type"] = matrix_df_src["type"].astype(str)
-
-# We'll build status + quantity for each type and component
-components = ["Reagent", "Calibrator", "QC"]
-
-# All assay types: those present in df plus mapping keys (so you see rows even if only calibrator/qc exists)
-types_in_data = set(matrix_df_src["type"].dropna().unique())
-test_types = sorted(types_in_data | set(CAL_MAP.keys()) | set(QC_MAP.keys()))
+# 🔴 strip here as well so status matrix uses normalized type names
+matrix_df_src["type"] = matrix_df_src["type"].astype(str).str.strip()
 
 def get_status_and_qty(sub: pd.DataFrame):
-    """Return (status, total_quantity) for a subset."""
     if sub.empty:
         return "missing", 0
     qty = int(sub["quantity"].sum())
@@ -319,11 +304,14 @@ def get_status_and_qty(sub: pd.DataFrame):
         status = "ok"
     return status, qty
 
+components = ["Reagent", "Calibrator", "QC"]
+types_in_data = set(matrix_df_src["type"].dropna().unique())
+test_types = sorted(types_in_data | set(CAL_MAP.keys()) | set(QC_MAP.keys()))
+
 rows = []
 for t in test_types:
     row = {"Type": t}
 
-    # ----- Reagent: only rows where type == t and component == Reagent -----
     sub_reag = matrix_df_src[
         (matrix_df_src["type"] == t) & (matrix_df_src["component"] == "Reagent")
     ]
@@ -331,36 +319,34 @@ for t in test_types:
     row["Reagent_status"] = reag_status
     row["Reagent_qty"] = reag_qty
 
-    # ----- Calibrator: type == t and mapped Universal Calibrator if exists -----
     sub_cal_local = matrix_df_src[
         (matrix_df_src["type"] == t) & (matrix_df_src["component"] == "Calibrator")
     ]
     if t in CAL_MAP:
         cal_type = CAL_MAP[t]
         sub_cal_shared = matrix_df_src[
-            (matrix_df_src["type"] == cal_type) & (matrix_df_src["component"] == "Calibrator")
+            (matrix_df_src["type"] == cal_type) &
+            (matrix_df_src["component"] == "Calibrator")
         ]
         sub_cal = pd.concat([sub_cal_local, sub_cal_shared])
     else:
         sub_cal = sub_cal_local
-
     cal_status, cal_qty = get_status_and_qty(sub_cal)
     row["Calibrator_status"] = cal_status
     row["Calibrator_qty"] = cal_qty
 
-    # ----- QC: type == t and mapped QCx if exists -----
     sub_qc_local = matrix_df_src[
         (matrix_df_src["type"] == t) & (matrix_df_src["component"] == "QC")
     ]
     if t in QC_MAP:
         qc_type = QC_MAP[t]
         sub_qc_shared = matrix_df_src[
-            (matrix_df_src["type"] == qc_type) & (matrix_df_src["component"] == "QC")
+            (matrix_df_src["type"] == qc_type) &
+            (matrix_df_src["component"] == "QC")
         ]
         sub_qc = pd.concat([sub_qc_local, sub_qc_shared])
     else:
         sub_qc = sub_qc_local
-
     qc_status, qc_qty = get_status_and_qty(sub_qc)
     row["QC_status"] = qc_status
     row["QC_qty"] = qc_qty
@@ -369,7 +355,6 @@ for t in test_types:
 
 status_matrix = pd.DataFrame(rows).set_index("Type")
 
-# Replace status text with symbols, keep qty as numbers
 status_display = status_matrix.copy()
 status_display[["Reagent_status", "Calibrator_status", "QC_status"]] = (
     status_display[["Reagent_status", "Calibrator_status", "QC_status"]].replace(
@@ -394,5 +379,3 @@ st.markdown(
 Columns `_qty` show the **total quantity** of that component (including shared Universal Calibrators and QC1/2/3 when mapped).
 """
 )
-
-
