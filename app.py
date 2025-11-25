@@ -36,7 +36,8 @@ if not st.session_state.authenticated:
 # PAGE SETUP
 st.set_page_config(page_title="MMCCCL Laboratory Supplies Tracker", layout="wide")
 
-import streamlit as st
+EXCEL_PATH = "MMCCCL_supply_Nov25-2025.xlsx"
+
 
 # --- Header layout ---
 col1, col2 = st.columns([1, 3])
@@ -53,18 +54,22 @@ with col2:
             Inventory Management Dashboard
         </p>
     """, unsafe_allow_html=True)
-
+st.markdown("---")
 # ============================================================
 # STEP 1 — UPLOAD EXCEL FILE
 # ============================================================
-uploaded_file = st.file_uploader("Upload Inventory Excel File", type=["xlsx"])
+if os.path.exists(EXCEL_PATH):
+    df = pd.read_excel(EXCEL_PATH)
+    st.success(f"Loaded file: {EXCEL_PATH}")
 
-if uploaded_file is None:
-    st.info("Please upload the Excel inventory file to begin.")
-    st.stop()
+    # Display data
+    st.subheader("📊 Supply Inventory Data")
+    st.dataframe(df, use_container_width=True)
 
-# Read file
-df_orig = pd.read_excel(uploaded_file)
+else:
+    st.error(f"❌ Excel file not found in repo: {EXCEL_PATH}")
+    st.info("Make sure the file is inside your repository root in GitHub Codespaces.")
+
 
 # ============================================================
 # STEP 2 — COLUMN AUTO-DETECTION HELPERS
