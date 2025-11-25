@@ -5,6 +5,101 @@ import streamlit as st
 import plotly.express as px
 import os
 from io import BytesIO
+# SIMPLE LOGIN / PASSCODE PROTECTION
+# -------------------------------------------------
+PASSCODE = "mmcccl2025"  # <-- change this to your secret code
+
+# Initialize session state
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+# Login form
+if not st.session_state.authenticated:
+    st.title("🔒 MMCCCL Onboarding Documents Login")
+
+    pass_input = st.text_input("Enter Passcode:", type="password")
+
+    if st.button("Submit"):
+        if pass_input == PASSCODE:
+            st.session_state.authenticated = True
+            st.success("✅ Access granted. Loading dashboard...")
+            st.rerun()
+        else:
+            st.error("❌ Incorrect passcode. Please try again.")
+
+    st.stop()  # Stop the script here if not authenticated
+
+
+# -------------------------------------------------
+# PAGE SETUP
+st.set_page_config(page_title="MMCCCL Onboarding Document Review & Sign", layout="wide")
+
+# --- Elegant Light-Themed Header Layout ---
+st.markdown("""
+    <style>
+    .header-container {
+        display: flex;
+        align-items: center;
+        gap: 1.2rem;
+        padding: 1rem 1.5rem;
+        background: linear-gradient(90deg, #f9f3f4 0%, #f2e5e8 60%, #ffffff 100%);
+        border-radius: 12px;
+        border: 1px solid #e3d8da;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        margin-bottom: 1.5rem;
+    }
+
+    .logo-left {
+        width: 170px;
+        max-height: 80px;
+        object-fit: contain;
+        background-color: white;
+        padding: 0.3rem;
+        border-radius: 8px;
+        border: 1px solid #eee;
+    }
+
+    .main-header {
+        color: #6e1e33;  /* Meharry maroon */
+        font-size: 1.0rem;
+        font-weight: 650;
+        line-height: 1.25;
+        margin: 0;
+        letter-spacing: 0.2px;
+    }
+
+    .sub-header {
+        color: #7a4f55;  /* softer complementary tone */
+        font-size: 0.6rem;
+        font-weight: 400;
+        margin-top: 0.25rem;
+        letter-spacing: 0.3px;
+    }
+
+    @media (max-width: 768px) {
+        .main-header { font-size: 1.0rem; }
+        .sub-header { font-size: 0.8rem; }
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- Header / Logo ---
+logo_path = "mmcccl_logo.png"
+logo_html = ""
+if Path(logo_path).exists():
+    logo_base64 = base64.b64encode(open(logo_path, "rb").read()).decode()
+    logo_html = f'<img src="data:image/png;base64,{logo_base64}" class="logo-left" />'
+
+# --- Render Header ---
+st.markdown(f"""
+<div class="header-container">
+    <div>{logo_html}</div>
+    <div>
+        <h1 class="main-header">MMCCCL Onboarding Document Review & Sign</h1>
+        <p class="sub-header">Meharry Medical College Consolidated Clinical Laboratories </p>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 st.set_page_config(page_title="Lab Supply Inventory", layout="wide")
 st.title("Lab Supply Inventory — Interactive Dashboard")
