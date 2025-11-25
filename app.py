@@ -33,77 +33,25 @@ if not st.session_state.authenticated:
 
 # -------------------------------------------------
 # PAGE SETUP
-st.set_page_config(page_title="MMCCCL Laboratory Supply Tracker", layout="wide")
+st.set_page_config(page_title="MMCCCL Laboratory Supplies Tracker", layout="wide")
 
-# --- Elegant Light-Themed Header Layout ---
-st.markdown("""
-    <style>
-    .header-container {
-        display: flex;
-        align-items: center;
-        gap: 1.2rem;
-        padding: 1rem 1.5rem;
-        background: linear-gradient(90deg, #f9f3f4 0%, #f2e5e8 60%, #ffffff 100%);
-        border-radius: 12px;
-        border: 1px solid #e3d8da;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-        margin-bottom: 1.5rem;
-    }
+import streamlit as st
 
-    .logo-left {
-        width: 170px;
-        max-height: 80px;
-        object-fit: contain;
-        background-color: white;
-        padding: 0.3rem;
-        border-radius: 8px;
-        border: 1px solid #eee;
-    }
+# --- Header layout ---
+col1, col2 = st.columns([1, 3])
 
-    .main-header {
-        color: #6e1e33;  /* Meharry maroon */
-        font-size: 1.0rem;
-        font-weight: 650;
-        line-height: 1.25;
-        margin: 0;
-        letter-spacing: 0.2px;
-    }
+with col1:
+    st.image("mmcccl_logo.png", use_column_width=True)
 
-    .sub-header {
-        color: #7a4f55;  /* softer complementary tone */
-        font-size: 0.6rem;
-        font-weight: 400;
-        margin-top: 0.25rem;
-        letter-spacing: 0.3px;
-    }
-
-    @media (max-width: 768px) {
-        .main-header { font-size: 1.0rem; }
-        .sub-header { font-size: 0.8rem; }
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-# --- Header / Logo ---
-logo_path = "mmcccl_logo.png"
-logo_html = ""
-if Path(logo_path).exists():
-    logo_base64 = base64.b64encode(open(logo_path, "rb").read()).decode()
-    logo_html = f'<img src="data:image/png;base64,{logo_base64}" class="logo-left" />'
-
-# --- Render Header ---
-st.markdown(f"""
-<div class="header-container">
-    <div>{logo_html}</div>
-    <div>
-        <h1 class="main-header">MMCCCL Onboarding Document Review & Sign</h1>
-        <p class="sub-header">Meharry Medical College Consolidated Clinical Laboratories </p>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-st.set_page_config(page_title="Lab Supply Inventory", layout="wide")
-st.title("Lab Supply Inventory — Interactive Dashboard")
+with col2:
+    st.markdown("""
+        <h1 style="font-size: 38px; margin-bottom: 0px;">
+            MMCCCL Laboratory Supplies Tracker
+        </h1>
+        <p style="font-size: 18px; margin-top: -10px; color: #555;">
+            Inventory Management Dashboard
+        </p>
+    """, unsafe_allow_html=True)
 
 # ============================================================
 # STEP 1 — UPLOAD EXCEL FILE
