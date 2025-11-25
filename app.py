@@ -273,7 +273,7 @@ for t in test_types:
 
 status_matrix = pd.DataFrame(rows).set_index("Type")
 
-# nice symbols for readability
+# readable icons
 status_display = status_matrix.replace({
     "ok": "🟢 OK",
     "expiring_soon": "🟡 Soon",
@@ -285,12 +285,11 @@ st.dataframe(status_display, use_container_width=True)
 
 st.markdown("""
 **Legend:**  
-🟢 OK = valid and available • 🟡 Soon = expiring in ≤ 30 days  
-🔴 Expired = past expiration • ⚪ Missing = no item found for that component
+🟢 OK – available • 🟡 Soon – expiring in 30 days  
+🔴 Expired – expired • ⚪ Missing – no item in inventory  
 """)
 
 st.markdown("---")
-
 
 # ============================================================
 # STEP 10 — PIE CHARTS WITH CORRECT GROUPING & HORIZONTAL LABELS
@@ -298,7 +297,7 @@ st.markdown("---")
 
 st.header("Inventory Status Breakdown by Type (Pie Charts)")
 
-# ---- Calibrator mapping: for each assay type, which Universal Calibrator type to add ----
+# ---- Calibrator mapping ----
 CAL_MAP = {
     "AST 2": "Universal Calibrator 1",
     "uric 2": "Universal Calibrator 1",
@@ -315,7 +314,7 @@ CAL_MAP = {
     "total protein 2": "Universal Calibrator 3",
 }
 
-# ---- QC mapping: for each assay type, which QC type to add ----
+# ---- QC mapping ----
 QC_MAP = {
     # QC1
     "FSH": "QC1",
@@ -326,6 +325,7 @@ QC_MAP = {
     "Total T4": "QC1",
     "Total T3": "QC1",
     "Vitamiin D": "QC1",
+
     # QC2
     "alblumin BCP": "QC2",
     "ALKP": "QC2",
@@ -343,22 +343,21 @@ QC_MAP = {
     "Trigly": "QC2",
     "urea nitrogen": "QC2",
     "uric acid": "QC2",
+
     # QC3
     "creatinine": "QC3",
     "microalbumin": "QC3",
 }
 
-# prepare df_plot with colors
+helper_types = set(CAL_MAP.values()) | set(["QC1", "QC2", "QC3"])
+
 df_plot = df.copy()
-df_plot["alert"] = df_plot["status"].map({
-    "expired": "red",
-    "expiring_soon": "yellow",
-    "ok": "green"
-})
+df_plot["alert"] = df_plot["status"].map(
+    {"expired": "red", "expiring_soon": "yellow", "ok": "green"}
+)
 df_plot["type"] = df_plot["type"].astype(str)
 
 def make_pie(df_sub: pd.DataFrame, title: str):
-    """Create a pie chart with equal slices and horizontal labels."""
     if df_sub.empty:
         return
 
@@ -373,7 +372,7 @@ def make_pie(df_sub: pd.DataFrame, title: str):
     fig = px.pie(
         df_sub,
         names="item",
-        values=[1] * len(df_sub),  # each item gets equal slice size
+        values=[1] * len(df_sub),   # equal slice size
         color="alert",
         title=title,
         color_discrete_map={"red": "red", "yellow": "yellow", "green": "green"},
@@ -386,26 +385,26 @@ def make_pie(df_sub: pd.DataFrame, title: str):
     )
     st.plotly_chart(fig, use_container_width=True)
 
-
-all_types = sorted(df_plot["type"].dropna().unique())
+all_types = sorted(df_plot["type"].unique())
 
 for t in all_types:
+    if t in helper_types:
+        continue
+
     base = df_plot[df_plot["type"] == t]
     if base.empty:
         continue
 
     combined = base.copy()
 
-    # add Universal Calibrator if mapping exists for this test type
     if t in CAL_MAP:
-        cal_type = CAL_MAP[t]
-        cal_rows = df_plot[df_plot["type"] == cal_type]
-        combined = pd.concat([combined, cal_rows], ignore_index=True)
+        combined = pd.concat([combined,
+                              df_plot[df_plot["type"] == CAL_MAP[t]]],
+                             ignore_index=True)
 
-    # add QC if mapping exists for this test type
     if t in QC_MAP:
-        qc_type = QC_MAP[t]
-        qc_rows = df_plot[df_plot["type"] == qc_type]
-        combined = pd.concat([combined, qc_rows], ignore_index=True)
+        combined = pd.concat([combined,
+                              df_plot[df_plot["type"] == QC_MAP[t]]],
+                             ignore_index=True)
 
     make_pie(combined, f"Type: {t}")
