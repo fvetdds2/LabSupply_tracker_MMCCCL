@@ -45,10 +45,10 @@ with col1:
 
 with col2:
     st.markdown("""
-        <h1 style="font-size: 38px; margin-bottom: 0px;">
+        <h1 style="font-size: 50px; margin-bottom: 0px;">
             MMCCCL Laboratory Supplies Tracker
         </h1>
-        <p style="font-size: 18px; margin-top: -10px; color: #555;">
+        <p style="font-size: 25px; margin-top: -10px; color: #555;">
             Inventory Management Dashboard
         </p>
     """, unsafe_allow_html=True)
