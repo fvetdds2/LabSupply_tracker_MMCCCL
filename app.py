@@ -7,7 +7,7 @@ import os
 from io import BytesIO
 # SIMPLE LOGIN / PASSCODE PROTECTION
 # -------------------------------------------------
-PASSCODE = "mmcccl2025"  # <-- change this to your secret code
+PASSCODE = "mmcccl2025"  
 
 # Initialize session state
 if "authenticated" not in st.session_state:
@@ -15,7 +15,7 @@ if "authenticated" not in st.session_state:
 
 # Login form
 if not st.session_state.authenticated:
-    st.title("🔒 MMCCCL Onboarding Documents Login")
+    st.title("🔒 MMCCCL lab supply tracker")
 
     pass_input = st.text_input("Enter Passcode:", type="password")
 
@@ -32,7 +32,7 @@ if not st.session_state.authenticated:
 
 # -------------------------------------------------
 # PAGE SETUP
-st.set_page_config(page_title="MMCCCL Onboarding Document Review & Sign", layout="wide")
+st.set_page_config(page_title="MMCCCL Laboratory Supply Tracker", layout="wide")
 
 # --- Elegant Light-Themed Header Layout ---
 st.markdown("""
