@@ -151,18 +151,21 @@ st.download_button(
 
 st.markdown("---")
 
+STEP 8 — EXPIRING SOON LIST DOWNLOAD (item + cat_no + quantity)
 # ============================================================
-# STEP 8 — EXPIRING SOON LIST DOWNLOAD (item + cat_no)
-# ============================================================
-exp_soon_df = df[df["status"] == "expiring_soon"][["item", "cat_no"]]
+# Filter and select item, cat_no, and quantity
+exp_soon_df = df[df["status"] == "expiring_soon"][["item", "cat_no", "quantity"]]
 
-st.subheader("Items Expiring in 30 Days")
-st.dataframe(exp_soon_df)
+# Aggregate quantity for display/download if the same item/cat_no appears multiple times
+exp_soon_grouped = exp_soon_df.groupby(["item", "cat_no"]).agg({"quantity": "sum"}).reset_index()
 
-csv_data = exp_soon_df.to_csv(index=False).encode("utf-8")
+st.subheader("Items Expiring in 30 Days (Item Name and Total Quantity)")
+st.dataframe(exp_soon_grouped, use_container_width=True) # Use the grouped data
+
+csv_data = exp_soon_grouped.to_csv(index=False).encode("utf-8")
 
 st.download_button(
-    "Download Expiring Soon (item + cat_no)",
+    "Download Expiring Soon Items (item + cat_no + qty)",
     data=csv_data,
     file_name="expiring_items.csv",
     mime="text/csv"
@@ -171,44 +174,62 @@ st.download_button(
 st.markdown("---")
 
 # ============================================================
-# STEP 9 — PIE CHARTS
+# STEP 9 — PIE CHARTS (Modified to show Item Name, Quantity, and Color-Coded)
 # ============================================================
-st.header("Status Dashboard")
+st.header("Expired and Expiring Soon Item Breakdown")
 
-counts = df["status"].value_counts().reindex(["expired", "expiring_soon", "ok"]).fillna(0)
+# --- 9a. Expired Items Breakdown (Red) ---
+expired_items = df[df["status"] == "expired"]
+if not expired_items.empty:
+    # Group by item/cat_no and sum quantities
+    expired_summary = expired_items.groupby(["item", "cat_no"])["quantity"].sum().reset_index()
+    # Create a combined label for the pie chart slices (Name + Cat No for clarity)
+    expired_summary["label"] = expired_summary["item"] + " (" + expired_summary["cat_no"] + ")"
 
-fig = px.pie(
-    names=counts.index,
-    values=counts.values,
-    title="Overall Inventory Status",
-    color=counts.index,
-    color_discrete_map={
-        "expired": "red",
-        "expiring_soon": "yellow",
-        "ok": "green"
-    }
-)
-
-st.plotly_chart(fig, use_container_width=True)
-
-# Group by type
-st.subheader("By Type")
-
-types = sorted(df["type"].dropna().unique().astype(str))
-
-for t in types:
-    sub = df[df["type"].astype(str) == t]
-    counts = sub["status"].value_counts().reindex(["expired", "expiring_soon", "ok"]).fillna(0)
-
-    fig2 = px.pie(
-        names=counts.index,
-        values=counts.values,
-        title=f"Type: {t}",
-        color=counts.index,
-        color_discrete_map={
-            "expired": "red",
-            "expiring_soon": "yellow",
-            "ok": "green"
-        }
+    fig_expired = px.pie(
+        expired_summary,
+        names="label",
+        values="quantity",
+        title="Total Quantity of Expired Items by Name (Red Alert)",
+        # Set all slices to red for attention
+        color_discrete_sequence=['red'] 
     )
-    st.plotly_chart(fig2, use_container_width=True)
+    
+    # Set textinfo to explicitly show 'label' (item description) and 'value' (quantity).
+    fig_expired.update_traces(
+        textinfo='label+value', 
+        hovertemplate='%{label}<br>Quantity: %{value}<extra></extra>'
+    )
+    
+    st.plotly_chart(fig_expired, use_container_width=True)
+else:
+    st.info("No items are currently reported as Expired. 🎉")
+
+st.markdown("---")
+
+# --- 9b. Expiring Soon Items Breakdown (Yellow) ---
+exp_soon_items = df[df["status"] == "expiring_soon"]
+if not exp_soon_items.empty:
+    # Group by item/cat_no and sum quantities
+    exp_soon_summary = exp_soon_items.groupby(["item", "cat_no"])["quantity"].sum().reset_index()
+    # Create a combined label for the pie chart slices (Name + Cat No for clarity)
+    exp_soon_summary["label"] = exp_soon_summary["item"] + " (" + exp_soon_summary["cat_no"] + ")"
+
+    fig_exp_soon = px.pie(
+        exp_soon_summary,
+        names="label",
+        values="quantity",
+        title="Total Quantity of Items Expiring in 30 Days by Name (Yellow Alert)",
+        # Set all slices to yellow for attention
+        color_discrete_sequence=['yellow'] 
+    )
+    
+    # Set textinfo to explicitly show 'label' (item description) and 'value' (quantity).
+    fig_exp_soon.update_traces(
+        textinfo='label+value', 
+        hovertemplate='%{label}<br>Quantity: %{value}<extra></extra>'
+    )
+    
+    st.plotly_chart(fig_exp_soon, use_container_width=True)
+else:
+    st.info("No items are currently reported as Expiring Soon. ✅")
