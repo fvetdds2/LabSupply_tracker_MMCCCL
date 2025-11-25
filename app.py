@@ -269,46 +269,70 @@ st.download_button(
 st.markdown("---")
 
 # ============================================================
-# STEP 9 — PIE CHARTS (Revised for Group by Type, Item/Qty/Date slices, and Color-Code)
+# STEP 9 — PIE CHARTS (Revised for custom grouping)
 # ============================================================
 st.header("Inventory Status Breakdown by Type")
 
+# Define Custom Chart Groups based on user request (Pools multiple 'type' values)
+CHART_GROUPS = {
+    # Universal Calibrator Groups
+    "Universal Calibrator 1": ["AST 2", "uric 2", "TPRO2", "ALT2"],
+    "Universal Calibrator 2": ["HDL"],
+    "Universal Calibrator 3": ["Chole", "Creatinine", "glucose", "triglycerides", "urea", "total protein 2"],
+    
+    # QC Groups
+    "QC1": ["FSH", "Free T3", "Free T4", "Testo", "TSH", "Total T4", "Total T3", "Vitamiin D"],
+    "QC2": ["alblumin BCP", "ALKP", "ALT", "AST", "Bliirubin", "calcium", "CO2", "ICT", "Choles", "CRP", "Glucose", "total protein", "Rheumatoid", "Trigly", "urea nitrogen", "uric acid"],
+    "QC3": ["creatinine", "microalbumin"],
+}
+
 # Filter out rows with missing item names or zero quantity before plotting
+# Ensure 'type' is treated as a string for robust comparison
 df_plot = df[df['item'].notna() & (df['quantity'] > 0)].copy()
-types = sorted(df_plot["type"].dropna().unique().astype(str))
+df_plot['type'] = df_plot['type'].astype(str)
 
-if not types:
-    st.info("No items available for charting.")
+# Set to track types that have been included in a custom group
+used_types = set()
 
-for t in types:
-    sub = df_plot[df_plot["type"].astype(str) == t].copy()
+# --- Shared Chart Generation Function ---
+def generate_pie_chart(data_frame, title_name):
+    """Helper function to generate a Plotly Pie Chart with custom labels."""
+    if data_frame.empty:
+        st.info(f"Chart Group: {title_name} — No valid items found.")
+        return
 
-    # Aggregate: sum quantity, and find the minimum (earliest) expiry date for each unique item/alert combination
-    summary = sub.groupby(["item", "cat_no", "alert"]).agg(
+    # Aggregate: sum quantity, and find the minimum (earliest) expiry date for each unique item/cat_no/alert combination
+    # Group by the item details and the alert status
+    summary = data_frame.groupby(["item", "cat_no", "alert"]).agg(
         quantity=('quantity', 'sum'),
-        expiry_date=('expiry_date', 'min') # Finds the earliest expiration date for the item
+        expiry_date=('expiry_date', 'min') 
     ).reset_index()
 
+    if summary.empty:
+        return
+
     # Create the text to display on the chart slice: Item Name + Qty + Date
-    # Format the date nicely for display
     summary["date_str"] = summary["expiry_date"].dt.strftime('%Y-%m-%d').fillna('N/A')
     
-    # Combine item name, quantity, and expiration date for the custom text label
+    # Combine item name, catalog number, quantity, and expiration date for the custom text label
     summary["display_text"] = (
         summary["item"].astype(str) + " (" + summary["cat_no"].astype(str) + ")" +
         "<br>Qty: " + summary["quantity"].astype(str) +
         "<br>Exp: " + summary["date_str"]
     )
     
-    # Use a generic name for the slice identity, but 'display_text' for what is shown
+    # Use item name for the slice identity
     summary["label"] = summary["item"].astype(str) 
 
+    # NOTE on "separated equally": Pie charts separate parts proportionally to the 'values' column (quantity).
+    # Setting values to 'quantity' is standard for inventory breakdown. If you truly need equal slices, 
+    # you would set values=1, but that would misrepresent the inventory breakdown by quantity.
     fig = px.pie(
         summary,
-        names="label",        # Used for slice key, hover, and legend
-        values="quantity",    # Slice size is Quantity
-        color="alert",        # Color slices by the alert status
-        title=f"Type: {t} — Item Quantity Breakdown",
+        names="label",        
+        values="quantity",    # Slice size is proportional to Quantity
+        color="alert",        
+        title=f"Chart Group: {title_name} — Item Quantity Breakdown",
         color_discrete_map={  # Color mapping
             "red": "red",
             "yellow": "yellow",
@@ -318,9 +342,35 @@ for t in types:
 
     # Use the custom 'display_text' for the slice text, and explicitly remove percentage
     fig.update_traces(
-        text=summary["display_text"], # Pass the custom text column
-        textinfo='text',             # Display the custom text
-        hovertemplate='%{text}<extra></extra>' # Show only the custom text on hover
+        text=summary["display_text"], 
+        textinfo='text',             
+        hovertemplate='%{text}<extra></extra>' 
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
+# 1. Generate charts for the Custom Groups
+st.subheader("Charts for Calibrator and QC Groupings")
+for chart_name, source_types in CHART_GROUPS.items():
+    # Filter the plot data to include all rows whose 'type' is in the source list
+    sub = df_plot[df_plot['type'].isin(source_types)].copy()
+    
+    # Add the source types to the set of used types
+    used_types.update(source_types)
+    
+    generate_pie_chart(sub, chart_name)
+
+# 2. Generate charts for any remaining single 'type' categories
+st.subheader("Charts for Remaining Individual Types")
+all_types = set(df_plot["type"].dropna().unique())
+remaining_types = sorted(list(all_types - used_types))
+
+if not remaining_types:
+    st.info("All relevant item types were included in the custom Calibrator/QC charts above.")
+else:
+    for t in remaining_types:
+        # Filter the plot data for the specific remaining type
+        sub = df_plot[df_plot["type"] == t].copy()
+        
+        # Use the original type name as the title
+        generate_pie_chart(sub, t)
