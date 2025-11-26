@@ -317,6 +317,9 @@ EXCLUDE_TYPES = {
     "qc1",
     "qc2",
     "qc3",
+    "Sysmex",
+    "General",
+    "GC test"
 }
 
 types_in_data = set(matrix_df_src["type"].dropna().unique())
