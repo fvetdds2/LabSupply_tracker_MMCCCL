@@ -290,7 +290,6 @@ def classify_component(item_name: str) -> str:
 
 matrix_df_src = df.copy()
 matrix_df_src["component"] = matrix_df_src["item"].apply(classify_component)
-# 🔴 strip here as well so status matrix uses normalized type names
 matrix_df_src["type"] = matrix_df_src["type"].astype(str).str.strip()
 
 def get_status_and_qty(sub: pd.DataFrame):
@@ -305,14 +304,33 @@ def get_status_and_qty(sub: pd.DataFrame):
         status = "ok"
     return status, qty
 
-components = ["Reagent", "Calibrator", "QC"]
+# 🚫 Types that should NOT appear as rows in the matrix
+EXCLUDE_TYPES = {
+    "universal calibrator1",
+    "universal calibrator2",
+    "universal calibrator3",
+    "maintenance",
+    "nan",
+    "test supply",
+    "qc1",
+    "qc2",
+    "qc3",
+}
+
+# All type names actually in the edited data
 types_in_data = set(matrix_df_src["type"].dropna().unique())
-test_types = sorted(types_in_data | set(CAL_MAP.keys()) | set(QC_MAP.keys()))
+
+# ✅ Final list of type rows to show in the status matrix
+test_types = sorted(
+    t for t in types_in_data
+    if str(t).strip().lower() not in EXCLUDE_TYPES
+)
 
 rows = []
 for t in test_types:
     row = {"Type": t}
 
+    # ----- Reagent -----
     sub_reag = matrix_df_src[
         (matrix_df_src["type"] == t) & (matrix_df_src["component"] == "Reagent")
     ]
@@ -320,14 +338,15 @@ for t in test_types:
     row["Reagent_status"] = reag_status
     row["Reagent_qty"] = reag_qty
 
+    # ----- Calibrator: local + mapped Universal Calibrator -----
     sub_cal_local = matrix_df_src[
         (matrix_df_src["type"] == t) & (matrix_df_src["component"] == "Calibrator")
     ]
     if t in CAL_MAP:
         cal_type = CAL_MAP[t]
         sub_cal_shared = matrix_df_src[
-            (matrix_df_src["type"] == cal_type) &
-            (matrix_df_src["component"] == "Calibrator")
+            (matrix_df_src["type"] == cal_type)
+            & (matrix_df_src["component"] == "Calibrator")
         ]
         sub_cal = pd.concat([sub_cal_local, sub_cal_shared])
     else:
@@ -336,14 +355,15 @@ for t in test_types:
     row["Calibrator_status"] = cal_status
     row["Calibrator_qty"] = cal_qty
 
+    # ----- QC: local + mapped QC1/2/3 -----
     sub_qc_local = matrix_df_src[
         (matrix_df_src["type"] == t) & (matrix_df_src["component"] == "QC")
     ]
     if t in QC_MAP:
         qc_type = QC_MAP[t]
         sub_qc_shared = matrix_df_src[
-            (matrix_df_src["type"] == qc_type) &
-            (matrix_df_src["component"] == "QC")
+            (matrix_df_src["type"] == qc_type)
+            & (matrix_df_src["component"] == "QC")
         ]
         sub_qc = pd.concat([sub_qc_local, sub_qc_shared])
     else:
@@ -377,6 +397,7 @@ st.markdown(
 🟢 OK – available • 🟡 Soon – expiring in 30 days  
 🔴 Expired – expired • ⚪ Missing – no item in inventory  
 
-Columns `_qty` show the **total quantity** of that component (including shared Universal Calibrators and QC1/2/3 when mapped).
+Columns `_qty` show the **total quantity** of that component
+(including shared Universal Calibrators and QC1/2/3 when mapped).
 """
 )
