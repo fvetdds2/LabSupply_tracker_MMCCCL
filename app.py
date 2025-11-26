@@ -388,7 +388,6 @@ status_display[["Reagent_status", "Calibrator_status", "QC_status"]] = (
     )
 )
 
-st.subheader("Reagent / Calibrator / QC Status with Quantities")
 st.dataframe(status_display, use_container_width=True)
 
 st.markdown(
