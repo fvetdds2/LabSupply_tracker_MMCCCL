@@ -207,26 +207,34 @@ st.download_button(
 st.markdown("---")
 
 # ============================================================
-# STEP 8 — EXPIRING SOON LIST DOWNLOAD
+# STEP 8 — EXPIRING + EXPIRED ITEMS FOR PURCHASING DEPARTMENT
 # ============================================================
-exp_soon_df = df[df["status"] == "expiring_soon"][["item", "cat_no", "quantity"]]
-exp_soon_grouped = (
-    exp_soon_df.groupby(["item", "cat_no"]).agg({"quantity": "sum"}).reset_index()
+
+# Include both expiring soon (≤30 days) AND expired items
+exp_purchasing_df = df[df["status"].isin(["expired", "expiring_soon"])][
+    ["item", "cat_no", "quantity", "expiry_date", "status"]
+]
+
+# Group by item and catalog number
+exp_purchasing_grouped = (
+    exp_purchasing_df.groupby(["item", "cat_no", "status"])
+    .agg({"quantity": "sum", "expiry_date": "min"})
+    .reset_index()
 )
 
-st.subheader("Items Expiring in 30 Days (Item Name and Total Quantity)")
-st.dataframe(exp_soon_grouped, use_container_width=True)
+st.subheader("⚠️ Items Needing Purchasing (Expired + Expiring in 30 Days)")
+st.dataframe(exp_purchasing_grouped, use_container_width=True)
 
-csv_data = exp_soon_grouped.to_csv(index=False).encode("utf-8")
+# Export CSV
+purch_csv_data = exp_purchasing_grouped.to_csv(index=False).encode("utf-8")
 
 st.download_button(
-    "Download Expiring Soon Items (item + cat_no + qty)",
-    data=csv_data,
-    file_name="expiring_items.csv",
+    "Download Purchasing Report (expired + expiring soon)",
+    data=purch_csv_data,
+    file_name="items_to_purchase.csv",
     mime="text/csv",
 )
 
-st.markdown("---")
 
 # ============================================================
 # STEP 9 — STATUS MATRIX (Reagent / Calibrator / QC + quantities)
