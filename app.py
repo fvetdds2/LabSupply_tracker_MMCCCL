@@ -233,18 +233,18 @@ st.markdown("---")
 st.header("Status Matrix — Reagent / Calibrator / QC by Test Type")
 
 CAL_MAP = {
-    "AST2": "Universal Calibrator 1",
-    "Uric Acid 2": "Universal Calibrator 1",
-    "total Protein2": "Universal Calibrator 1",
-    "ALT2": "Universal Calibrator 1",
-    "Ultra HDL": "Universal Calibrator 2",
-    "Chol": "Universal Calibrator 3",
-    "Creatinine": "Universal Calibrator 3",
-    "glucose": "Universal Calibrator 3",
-    "TRIG": "Universal Calibrator 3",
-    "Urea": "Universal Calibrator 3",
-    "Albumin BCP": "Universal Calibrator 3",
-    "total protein 2": "Universal Calibrator 3",
+    "AST2": "Universal Calibrator1",
+    "Uric Acid 2": "Universal Calibrator1",
+    "total Protein2": "Universal Calibrator1",
+    "ALT2": "Universal Calibrator1",
+    "Ultra HDL": "Universal Calibrator2",
+    "Chol": "Universal Calibrator3",
+    "Creatinine": "Universal Calibrator3",
+    "glucose": "Universal Calibrator3",
+    "TRIG": "Universal Calibrator3",
+    "Urea": "Universal Calibrator3",
+    "Albumin BCP": "Universal Calibrator3",
+    "total protein 2": "Universal Calibrator3",
 }
 
 QC_MAP = {
