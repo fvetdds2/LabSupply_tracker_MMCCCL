@@ -97,40 +97,46 @@ auto_qty = find_col(df_orig, ["quantity", "qty"])
 auto_exp = find_col(df_orig, ["expiry", "expiration", "exp_date", "expiry_date"])
 
 # ============================================================
-# STEP 3 — SIDEBAR COLUMN MAPPING
+# STEP 3 — CLEAN & STANDARDIZE COLUMN NAMES (NO SIDEBAR)
 # ============================================================
-st.sidebar.header("Column Mapping")
-
-platform_col = st.sidebar.text_input("Platform column", value=auto_platform or "platform")
-type_col = st.sidebar.text_input("Type column", value=auto_type or "type")
-item_col = st.sidebar.text_input("Item column", value=auto_item or "item")
-cat_col = st.sidebar.text_input("Catalog number column", value=auto_catno or "cat_no")
-qty_col = st.sidebar.text_input("Quantity column", value=auto_qty or "quantity")
-expiry_col = st.sidebar.text_input("Expiry date column", value=auto_exp or "expiry_date")
 
 df = df_orig.copy()
 
-for col in [platform_col, type_col, item_col, cat_col, qty_col, expiry_col]:
-    if col not in df.columns:
-        df[col] = pd.NA
+# Convert all column names to lowercase for easy matching
+df.columns = df.columns.str.lower().str.strip()
 
-df = df.rename(
-    columns={
-        platform_col: "platform",
-        type_col: "type",
-        item_col: "item",
-        cat_col: "cat_no",
-        qty_col: "quantity",
-        expiry_col: "expiry_date",
-    }
-)
+COLUMN_MAP = {
+    "platform": ["platform", "site"],
+    "type": ["type", "category"],
+    "item": ["item", "description", "item_description"],
+    "cat_no": ["cat_no", "catalog", "catalog_number"],
+    "quantity": ["quantity", "qty"],
+    "expiry_date": ["expiry", "expiration", "exp_date", "expiry_date"],
+}
 
+def find_column(possible_names):
+    for name in possible_names:
+        if name.lower() in df.columns:
+            return name.lower()
+    return None
+
+mapped_cols = {}
+for standard_name, choices in COLUMN_MAP.items():
+    col = find_column(choices)
+    if col is None:
+        df[standard_name] = pd.NA   # create empty column if not found
+        mapped_cols[standard_name] = standard_name
+    else:
+        df = df.rename(columns={col: standard_name})
+        mapped_cols[standard_name] = standard_name
+
+# Quantity numeric
 df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce").fillna(0).astype(int)
 
-# 🔴 IMPORTANT: strip spaces from type so "ALT2" and "ALT2 " become the same
+# Strip spaces from type
 df["type"] = df["type"].astype(str).str.strip()
 
-# Parse expiry dates
+# Parse dates
 today = pd.to_datetime(datetime.now().date())
 df["expiry_date"] = pd.to_datetime(df["expiry_date"], errors="coerce")
 
