@@ -8,26 +8,26 @@ from io import BytesIO
 # ===========================
 # SIMPLE LOGIN / PASSCODE
 # ===========================
-#PASSCODE = "mmcccl2025"
+PASSCODE = "mmcccl2025"
 
-#if "authenticated" not in st.session_state:
-#    st.session_state.authenticated = False
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
 
-#if not st.session_state.authenticated:
-#    st.set_page_config(page_title="MMCCCL Laboratory Supplies Tracker", layout="wide")
-#    st.title("🔒 MMCCCL lab supply tracker")
+if not st.session_state.authenticated:
+    st.set_page_config(page_title="MMCCCL Laboratory Supplies Tracker", layout="wide")
+    st.title("🔒 MMCCCL lab supply tracker")
 
-#    pass_input = st.text_input("Enter Passcode:", type="password")
+   pass_input = st.text_input("Enter Passcode:", type="password")
 
-#    if st.button("Submit"):
-#       if pass_input == PASSCODE:
-#            st.session_state.authenticated = True
-#            st.success("✅ Access granted. Loading dashboard...")
-#            st.rerun()
-#        else:
-#            st.error("❌ Incorrect passcode. Please try again.")
+    if st.button("Submit"):
+       if pass_input == PASSCODE:
+            st.session_state.authenticated = True
+            st.success("✅ Access granted. Loading dashboard...")
+            st.rerun()
+        else:
+            st.error("❌ Incorrect passcode. Please try again.")
 
-#    st.stop()
+    st.stop()
 
 # ===========================
 # PAGE SETUP
