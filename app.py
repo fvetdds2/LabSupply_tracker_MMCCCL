@@ -17,7 +17,7 @@ if not st.session_state.authenticated:
     st.set_page_config(page_title="MMCCCL Laboratory Supplies Tracker", layout="wide")
     st.title("🔒 MMCCCL lab supply tracker")
 
-   pass_input = st.text_input("Enter Passcode:", type="password")
+    pass_input = st.text_input("Enter Passcode:", type="password")
 
     if st.button("Submit"):
        if pass_input == PASSCODE:
