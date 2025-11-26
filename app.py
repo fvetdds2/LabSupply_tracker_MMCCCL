@@ -34,7 +34,7 @@ if not st.session_state.authenticated:
 # ===========================
 st.set_page_config(page_title="MMCCCL Laboratory Supplies Tracker", layout="wide")
 
-EXCEL_PATH = "MMCCCL_supply_Nov26-2025.xlsx"
+EXCEL_PATH = "MMCCCL_supply_Nov25-2025.xlsx"
 
 # --- Header layout ---
 col1, col2 = st.columns([1, 3])
