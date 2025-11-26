@@ -20,7 +20,7 @@ if not st.session_state.authenticated:
     pass_input = st.text_input("Enter Passcode:", type="password")
 
     if st.button("Submit"):
-       if pass_input == PASSCODE:
+        if pass_input == PASSCODE:
             st.session_state.authenticated = True
             st.success("✅ Access granted. Loading dashboard...")
             st.rerun()
