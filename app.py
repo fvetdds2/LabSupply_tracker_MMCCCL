@@ -71,7 +71,7 @@ if not os.path.exists(EXCEL_PATH):
 df = pd.read_excel(EXCEL_PATH)
 df_orig = df.copy()
 
-st.subheader("📊 Supply Inventory Data (Raw)")
+st.subheader("📊 Supply Inventory Raw Data")
 st.dataframe(df, use_container_width=True)
 
 # ============================================================
@@ -96,47 +96,44 @@ auto_catno = find_col(df_orig, ["cat_no", "catalog", "catalog_number"])
 auto_qty = find_col(df_orig, ["quantity", "qty"])
 auto_exp = find_col(df_orig, ["expiry", "expiration", "exp_date", "expiry_date"])
 
-# ============================================================
-# STEP 3 — CLEAN & STANDARDIZE COLUMN NAMES (NO SIDEBAR)
+ ============================================================
+# STEP 3 — STANDARDIZE COLUMNS (NO SIDEBAR)
 # ============================================================
 
 df = df_orig.copy()
 
-# Convert all column names to lowercase for easy matching
-df.columns = df.columns.str.lower().str.strip()
+# choose actual column names (fall back to default names if not found)
+platform_col = auto_platform or "platform"
+type_col = auto_type or "type"
+item_col = auto_item or "item"
+cat_col = auto_catno or "cat_no"
+qty_col = auto_qty or "quantity"
+expiry_col = auto_exp or "expiry_date"
 
-COLUMN_MAP = {
-    "platform": ["platform", "site"],
-    "type": ["type", "category"],
-    "item": ["item", "description", "item_description"],
-    "cat_no": ["cat_no", "catalog", "catalog_number"],
-    "quantity": ["quantity", "qty"],
-    "expiry_date": ["expiry", "expiration", "exp_date", "expiry_date"],
-}
+# create missing cols if they do not exist
+for col in [platform_col, type_col, item_col, cat_col, qty_col, expiry_col]:
+    if col not in df.columns:
+        df[col] = pd.NA
 
-def find_column(possible_names):
-    for name in possible_names:
-        if name.lower() in df.columns:
-            return name.lower()
-    return None
+# rename to internal standard column names
+df = df.rename(
+    columns={
+        platform_col: "platform",
+        type_col: "type",
+        item_col: "item",
+        cat_col: "cat_no",
+        qty_col: "quantity",
+        expiry_col: "expiry_date",
+    }
+)
 
-mapped_cols = {}
-for standard_name, choices in COLUMN_MAP.items():
-    col = find_column(choices)
-    if col is None:
-        df[standard_name] = pd.NA   # create empty column if not found
-        mapped_cols[standard_name] = standard_name
-    else:
-        df = df.rename(columns={col: standard_name})
-        mapped_cols[standard_name] = standard_name
-
-# Quantity numeric
+# numeric quantity
 df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce").fillna(0).astype(int)
 
-# Strip spaces from type
+# clean type labels
 df["type"] = df["type"].astype(str).str.strip()
 
-# Parse dates
+# parse dates
 today = pd.to_datetime(datetime.now().date())
 df["expiry_date"] = pd.to_datetime(df["expiry_date"], errors="coerce")
 
@@ -188,7 +185,6 @@ exp_soon_mask = edit_df["expiry_date"].notna() & (
 edit_df.loc[expired_mask, "status"] = "expired"
 edit_df.loc[exp_soon_mask & ~expired_mask, "status"] = "expiring_soon"
 
-# 🔴 strip spaces again in case user edited types
 edit_df["type"] = edit_df["type"].astype(str).str.strip()
 
 df = edit_df.copy()
@@ -323,10 +319,8 @@ EXCLUDE_TYPES = {
     "qc3",
 }
 
-# All type names actually in the edited data
 types_in_data = set(matrix_df_src["type"].dropna().unique())
 
-# ✅ Final list of type rows to show in the status matrix
 test_types = sorted(
     t for t in types_in_data
     if str(t).strip().lower() not in EXCLUDE_TYPES
@@ -336,7 +330,7 @@ rows = []
 for t in test_types:
     row = {"Type": t}
 
-    # ----- Reagent -----
+    # Reagent
     sub_reag = matrix_df_src[
         (matrix_df_src["type"] == t) & (matrix_df_src["component"] == "Reagent")
     ]
@@ -344,7 +338,7 @@ for t in test_types:
     row["Reagent_status"] = reag_status
     row["Reagent_qty"] = reag_qty
 
-    # ----- Calibrator: local + mapped Universal Calibrator -----
+    # Calibrator (local + mapped Universal Calibrator)
     sub_cal_local = matrix_df_src[
         (matrix_df_src["type"] == t) & (matrix_df_src["component"] == "Calibrator")
     ]
@@ -361,7 +355,7 @@ for t in test_types:
     row["Calibrator_status"] = cal_status
     row["Calibrator_qty"] = cal_qty
 
-    # ----- QC: local + mapped QC1/2/3 -----
+    # QC (local + mapped QC1/2/3)
     sub_qc_local = matrix_df_src[
         (matrix_df_src["type"] == t) & (matrix_df_src["component"] == "QC")
     ]
