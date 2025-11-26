@@ -250,6 +250,7 @@ CAL_MAP = {
 QC_MAP = {
     "FSH": "QC1",
     "Free T3": "QC1",
+    "Anti-TPO": "QC1",
     "Free T4": "QC1",
     "Testosterone": "QC1",
     "TSH": "QC1",
