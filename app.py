@@ -96,7 +96,7 @@ auto_catno = find_col(df_orig, ["cat_no", "catalog", "catalog_number"])
 auto_qty = find_col(df_orig, ["quantity", "qty"])
 auto_exp = find_col(df_orig, ["expiry", "expiration", "exp_date", "expiry_date"])
 
- ============================================================
+#============================================================
 # STEP 3 — STANDARDIZE COLUMNS (NO SIDEBAR)
 # ============================================================
 
