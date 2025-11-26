@@ -243,6 +243,7 @@ CAL_MAP = {
     "TRIG": "Universal Calibrator3",
     "Urea": "Universal Calibrator3",
     "Albumin BCP": "Universal Calibrator3",
+    "Calcium": "Universal Calibrator3",
     "Total Protein2": "Universal Calibrator3",
 }
 
