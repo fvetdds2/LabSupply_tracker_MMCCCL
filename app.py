@@ -8,7 +8,7 @@ from io import BytesIO
 # ===========================
 # SIMPLE LOGIN / PASSCODE
 # ===========================
-PASSCODE = "mmcccl2025"
+PASSCODE = "2025"
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
